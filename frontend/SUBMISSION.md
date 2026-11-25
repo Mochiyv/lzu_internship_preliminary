@@ -39,6 +39,21 @@ npm run dev
 # 打开 http://localhost:5173
 ```
 
+前置条件：Node.js 18+（`node -v`、`npm -v` 都要能打印版本号）。两个命令都必须在
+`frontend/` 目录下执行，`package.json` 在那里；在仓库根目录跑会报
+`npm error enoent Could not read package.json`。
+
+> 启动失败时的排查顺序：
+> 1. **`npm` 不是可识别的命令** → Node 装了但没进 `PATH`。临时补一行
+>    `$env:Path = "C:\Program Files\nodejs;" + $env:Path` 再跑，或直接重开终端。
+> 2. **`Error: Port 5173 is already in use`** → 上一次的 dev server 还没退。
+>    `vite.config.js` 里是 `strictPort: true`，端口被占会直接退出而不是自动换端口。
+>    执行 `Get-NetTCPConnection -LocalPort 5173 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }` 后重试。
+> 3. **页面能开但列表是错误态** → 后端没起或不在 8080。前端把 `/api` 代理到
+>    `http://localhost:8080`，先确认 `curl http://localhost:8080/api/products?pageSize=1` 有返回。
+> 4. 端口本身被改过时会读到 `API_TARGET` / `MOCK_PORT` / `BACKEND_PORT` 环境变量，
+>    优先级见 `vite.config.js` 的 `resolveApiTarget`。
+
 验证后端真的起来了：
 
 ```bash
