@@ -58,6 +58,7 @@
 | `components/ProductList.vue` | 筛选栏 + 三态 + 表格骨架 | 只负责「怎么显示」，行内的交互交给子组件 |
 | `components/ProductRow.vue` | 单行渲染 + `pending` 态禁用按钮 | 行是唯一需要处理「正在请求」粒度的单位 |
 | `utils/money.js` | `yuanToFen` / `fenToYuan` | 钱的换算最容易出错，独立成纯函数才好测（16 条测试全打这里） |
+| `vite.config.js` | 5173 固定端口 + `/api` 代理 + `resolveApiTarget()` 优先级 | 「前端凭什么连得上后端」的唯一开关，独立成可导出的纯函数才能被测试锁住 |
 
 **如果再加「退款」和「优惠券」，哪里最先乱掉？**
 
@@ -116,9 +117,38 @@ POST 网络断了（后端没起）
 - **代价是**：重启就丢掉我刚发布的商品。所以我把它写进 `SUBMISSION.md` 的数据说明里，
   并明确「没有 `/api/_reset`，重启就是复位」——用**重启**代替复位接口，少一个要维护的端点。
 
+选内存库就带出一个必须交代的事：**那 24 条种子数据是哪来的**。
+`backend/data.sql` 是我**逐行手写**的，不是框架生成的。判断依据是项目里根本没有能生成它的东西：
+`pom.xml` 的依赖只有 `spring-boot-starter-web` / `-jdbc` / `h2` / `-test`，
+没有 Flyway、Liquibase、JPA（Hibernate 的 `ddl-auto`）、jOOQ 或 MyBatis Generator，
+全仓库 grep 也搜不到这些关键字。`spring.sql.init.data-locations` 只是**执行** `data.sql`，
+不负责**产出**它。
+
+那 24 条的内容不是我编的，是照着题目给的 `frontend/mock/db.json` 一条条转写成 `INSERT`，
+所以「直连后端」和「用 mock」看到的是同一批数据。转写时我特意保留了 mock 里那些边界样本
+（`stock=0` 缺货、`status=off` 已下架、`price=9999999`、50 字标题、`<script>` 标题、emoji），
+因为它们是唯一能验证「表格不会撑破、XSS 不会被当 HTML 渲染、分页边界正确」的输入。
+如果只塞 24 条「耳机 99 元」的规整数据，截图好看，但等于没测。
+
 另一组我也真纠结过的取舍：**前端走 Vite proxy 还是直接跨域打 8080**。
 选了 proxy，因为后端没配 CORS，proxy 让浏览器看起来是同源，省掉一段容易配错的 CORS 配置；
 代价是前端多依赖一个中间层，`API_TARGET` 没设对时会 502 而不是明确的跨域报错。
+
+这个取舍是**实测出来**的，不是照文档抄的。当时先给后端发了两个请求：
+
+```
+GET     /api/products   Origin: http://localhost:5173  →  200，响应里没有 Access-Control-Allow-Origin
+OPTIONS /api/products   Access-Control-Request-Method: POST  →  403 Forbidden
+```
+
+结论很清楚：`GET` 浏览器会拿到 200 但**把响应体丢掉**（缺 `Allow-Origin`），
+`POST / PATCH` 因为带 `Content-Type: application/json` 不是简单请求，会先被预检挡在 403。
+也就是说前端如果写成 `http://localhost:8080/api`，五个功能里只有「列表」勉强能看到半个结果。
+所以必须二选一：要么在后端加 `WebMvcConfigurer` 开 CORS，要么让请求同源。选了后者。
+
+因为这条链路是「看不见的」，我把 `resolveApiTarget()` 从 `vite.config.js` 里 `export` 出来，
+并加了 `test/proxy.test.js` 锁住代理目标和端口。这样「前端凭什么能连上后端」有测试兜着，
+而不是靠某次手动点通了就算数。
 
 ---
 

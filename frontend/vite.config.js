@@ -6,8 +6,10 @@ import vue from '@vitejs/plugin-vue'
  *   1. API_TARGET —— 完整地址，最灵活（如 http://127.0.0.1:3001 回退到 mock）
  *   2. MOCK_PORT  —— 兼容题目给的 mock 用法
  *   3. 默认 http://127.0.0.1:8080 —— Spring Boot 后端
+ *
+ * 导出只为单测能直接断言优先级（test/proxy.test.js），运行时由 Vite 调用。
  */
-function resolveApiTarget(env) {
+export function resolveApiTarget(env) {
   if (env.API_TARGET) return env.API_TARGET
   if (env.MOCK_PORT) return `http://127.0.0.1:${env.MOCK_PORT}`
   return `http://127.0.0.1:${env.BACKEND_PORT || '8080'}`

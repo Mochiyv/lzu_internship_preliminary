@@ -34,7 +34,7 @@ cd backend
 
 # 终端 2：前端
 cd frontend
-npm install
+npm ci                  # 按 package-lock.json 装依赖，版本可复现；改依赖时才用 npm install
 npm run dev
 # 打开 http://localhost:5173
 ```
@@ -61,12 +61,45 @@ curl "http://localhost:8080/api/products?pageSize=5"
 # 应返回 {"code":0,"message":"ok","data":{"total":24,...}}
 ```
 
+### 前端怎么连到后端（方案 A：Vite 代理）
+
+前端代码里没有任何后端地址，所有请求都是同源相对路径 `/api/...`
+（`src/api/client.js` 的 `BASE = import.meta.env.VITE_API_BASE || '/api'`）。
+真正把请求送到后端的是 `vite.config.js` 里的这一段：
+
+```js
+server: {
+  port: 5173,
+  strictPort: true,
+  proxy: { '/api': { target: apiTarget, changeOrigin: true } },
+}
+```
+
+`apiTarget` 由 `resolveApiTarget()` 按 **`API_TARGET` > `MOCK_PORT` > `BACKEND_PORT` > 默认 8080**
+的顺序算出来，所以默认就是浏览器请求 `localhost:5173/api/products`
+→ Vite 转发到 `localhost:8080/api/products` → 拿回结果。
+
+这样做的好处是**浏览器眼里始终是同源请求**，后端不用开 CORS。
+本项目后端确实没配 CORS：`OPTIONS /api/products` 预检会返回 `403`，
+`GET` 也拿不到 `Access-Control-Allow-Origin` 响应头。如果要改成前端直接写
+`http://localhost:8080/api`（跨域），就必须同时给后端加 CORS 配置，否则所有
+`POST` / `PATCH` 都会在预检阶段被拦掉。代理方案和 CORS 方案**不要同时开**：
+代理生效时请求同源，CORS 配置根本不会被触发。
+
 ### 三个可选开关
+
+这三个变量都可写进 `frontend/.env.local`（已被 gitignore，不会提交），
+也可以只在命令行临时给。`.env.example` 是它们的模板，复制改名即可：
+
+```bash
+cp .env.example .env.local
+```
 
 | 变量 | 作用 |
 |---|---|
-| `API_TARGET=http://host:port` | 前端代理指向任意地址（默认 `http://localhost:8080`） |
-| `MOCK_PORT=3001 npm run dev` | 切回题目自带的 mock 服务（需要先在 `mock/` 下起 mock） |
+| `API_TARGET=http://host:port` | 前端代理指向任意完整地址（优先级最高） |
+| `MOCK_PORT=3001` | 切回题目自带的 mock 服务（需要先在 `mock/` 下起 mock） |
+| `BACKEND_PORT=8081` | 后端换了端口时只改端口号 |
 | `VITE_API_BASE=/api` | 请求前缀，默认就是 `/api`，一般不用改 |
 
 ### 数据说明
@@ -99,7 +132,7 @@ L0 明细：
 ## 测试 / 自检
 
 ```bash
-# 前端：23 条
+# 前端：32 条
 cd frontend && npm test
 
 # 后端：27 条
@@ -111,11 +144,17 @@ cd backend && ./mvnw -o test
 ```
  ✓ test/money.test.js (16 tests) 8ms
  ✓ test/products.test.js (7 tests) 10ms
+ ✓ test/proxy.test.js (9 tests) 8ms
 
- Test Files  2 passed (2)
-      Tests  23 passed (23)
-   Duration  720ms
+ Test Files  3 passed (3)
+      Tests  32 passed (32)
+   Duration  1.33s
 ```
+
+`proxy.test.js` 锁的是「前端凭什么能连上后端」这件事本身：
+`resolveApiTarget()` 的四级优先级（`API_TARGET` > `MOCK_PORT` > `BACKEND_PORT` > 8080）、
+`proxy['/api']` 的目标与 `changeOrigin`、`strictPort` 固定 5173。
+只要有人改坏代理配置，这几条会立刻红。
 
 后端输出：
 

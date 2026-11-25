@@ -5,8 +5,13 @@
  * - `code !== 0`：抛 `ApiError`，`message` 就是后端 / mock 的中文提示，
  *   页面必须把它显示给用户（README §4.3：业务错误不能只打 Console）。
  *
- * 默认走同源 `/api`，由 Vite 代理到后端（默认 http://127.0.0.1:8080）；
- * 想直连别的地址时设置 `VITE_API_BASE`（如 `http://127.0.0.1:8080/api`）。
+ * 默认走同源 `/api`，由 Vite 代理到后端（`vite.config.js` 的 `server.proxy`，
+ * 目标默认 http://127.0.0.1:8080，可用 API_TARGET / MOCK_PORT / BACKEND_PORT 覆盖）。
+ * 前端始终同源请求，所以后端**不需要**配 CORS。
+ *
+ * 只有在前端独立部署（不走 Vite dev server）时才需要 `VITE_API_BASE`
+ * 显式指向后端，例如 `VITE_API_BASE=http://127.0.0.1:8080/api`——那时浏览器
+ * 会真的跨域，后端必须同时开 CORS。
  */
 const BASE = (import.meta.env.VITE_API_BASE || '/api').replace(/\/+$/, '')
 
