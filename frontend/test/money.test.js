@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fenToYuan, formatPrice, yuanToFen, yuanToPositiveFen } from '../src/utils/money.js'
+import { fenToYuan, formatPrice, multiplyFen, yuanToFen, yuanToPositiveFen } from '../src/utils/money.js'
 
 describe('fenToYuan / formatPrice（分 → 元）', () => {
   it('补足两位小数，末尾的 0 不能省', () => {
@@ -101,5 +101,47 @@ describe('往返换算（元 → 分 → 元）', () => {
     for (const yuan of ['0.01', '1.99', '12.50', '19.90', '99999.99', '1234567.89']) {
       expect(fenToYuan(yuanToFen(yuan))).toBe(yuan)
     }
+  })
+})
+
+describe('multiplyFen（单价 × 数量，L1-8 前端预估总价）', () => {
+  it('常规整数相乘', () => {
+    expect(multiplyFen(2990, 2)).toBe(5980)
+    expect(multiplyFen(1, 1)).toBe(1)
+  })
+
+  it('数量为 0 时总价是 0，不是 null（商品可以是 0 件，只是不让提交）', () => {
+    expect(multiplyFen(2990, 0)).toBe(0)
+  })
+
+  it('免费商品（单价 0）也算得出来', () => {
+    expect(multiplyFen(0, 5)).toBe(0)
+  })
+
+  it('大单价 × 大数量仍精确，不出现浮点误差', () => {
+    expect(multiplyFen(99999999, 100)).toBe(9999999900)
+  })
+
+  it('结果超出安全整数范围返回 null，不产生错误金额', () => {
+    expect(multiplyFen(Number.MAX_SAFE_INTEGER, 2)).toBeNull()
+  })
+
+  it('非法入参返回 null，界面据此显示「—」而不是 NaN', () => {
+    expect(multiplyFen(null, 1)).toBeNull()
+    expect(multiplyFen(undefined, 1)).toBeNull()
+    expect(multiplyFen('abc', 2)).toBeNull()
+    expect(multiplyFen(2990, 'abc')).toBeNull()
+    // 数量必须是整数件：1.5 件不合法
+    expect(multiplyFen(2990, 1.5)).toBeNull()
+    expect(multiplyFen(NaN, 1)).toBeNull()
+  })
+
+  it('字符串数字也吃得下（和 fenToYuan 的宽容度保持一致）', () => {
+    expect(multiplyFen('2990', '2')).toBe(5980)
+  })
+
+  it('负单价 / 负数量返回 null', () => {
+    expect(multiplyFen(-1, 2)).toBeNull()
+    expect(multiplyFen(100, -2)).toBeNull()
   })
 })

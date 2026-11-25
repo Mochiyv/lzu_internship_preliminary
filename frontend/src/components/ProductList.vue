@@ -10,9 +10,11 @@ const props = defineProps({
   error: { type: String, default: '' },
   filters: { type: Object, required: true },
   pendingIds: { type: Array, default: () => [] },
+  // 从「发布成功」跳回列表时会带上 highlight=新 id，让新行一眼可见
+  highlightId: { type: Number, default: 0 },
 })
 
-const emit = defineEmits(['update:filters', 'search', 'clear', 'toggle', 'retry'])
+const emit = defineEmits(['update:filters', 'search', 'clear', 'toggle', 'buy', 'retry'])
 
 const hasFilters = computed(
   () => Boolean(props.filters.keyword.trim() || props.filters.status || props.filters.category),
@@ -97,7 +99,9 @@ function patch(key, value) {
             :key="item.id"
             :item="item"
             :pending="pendingIds.includes(item.id)"
+            :highlight="item.id === highlightId"
             @toggle="emit('toggle', $event)"
+            @buy="emit('buy', $event)"
           />
         </tbody>
       </table>

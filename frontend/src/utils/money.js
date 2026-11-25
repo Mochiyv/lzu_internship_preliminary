@@ -54,3 +54,28 @@ export function yuanToPositiveFen(input) {
   const fen = yuanToFen(input)
   return fen !== null && fen > 0 ? fen : null
 }
+
+/**
+ * 下单预估总价：单价（分）× 数量。
+ *
+ * 单位是「分」，两个整数相乘本来就不会有浮点误差，所以这里仍然只做整数运算；
+ * 但入参必须自己保证是整数（数量来自输入框，是字符串），
+ * 否则 `Number('2.5')` 这种会算出小数分，预估金额和服务端对不上。
+ *
+ * 注意 `Number(null)` 和 `Number('')` 都是 0：如果直接转数字，
+ * 「商品价格还没加载出来」会被算成 0 元免费，所以先把这类空值挡掉。
+ *
+ * @param {number} unitPrice 单价（分）
+ * @param {number|string} quantity 数量
+ * @returns {number|null} 总价（分），任一侧非法一律 null
+ */
+export function multiplyFen(unitPrice, quantity) {
+  if (unitPrice === null || unitPrice === undefined || unitPrice === '') return null
+  if (quantity === null || quantity === undefined || quantity === '') return null
+  const price = Number(unitPrice)
+  const count = Number(quantity)
+  if (!Number.isSafeInteger(price) || price < 0) return null
+  if (!Number.isSafeInteger(count) || count < 0) return null
+  const total = price * count
+  return Number.isSafeInteger(total) ? total : null
+}

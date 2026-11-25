@@ -116,8 +116,8 @@ cp .env.example .env.local
 | 层级 | 完成情况 |
 |---|---|
 | L0 | 做了 **5 / 5** 条 |
-| L1 | 做了 **0 / 4** 条 |
-| L2 | 未做 |
+| L1 | 做了 **4 / 4** 条 |
+| L2 | 做了 **L2-13 B 路由**（多页面 + `/products/:id` 详情页） |
 
 L0 明细：
 
@@ -129,26 +129,53 @@ L0 明细：
 | L0-4 | `GET /api/products/{id}` 详情接口（404 / 400 分支） | 完成 |
 | L0-5 | `PATCH /api/products/{id}/status` 上下架 + 前端即时回写 | 完成 |
 
+L1 明细：
+
+| 编号 | 内容 | 状态 |
+|---|---|---|
+| L1-1 | `GET /api/orders?buyerPhone=` 订单列表接口（按手机号归属 + 分页） | 完成 |
+| L1-2 | 我的订单（表格 + 加载/空/错三态 + 中文状态 + 时间格式化） | 完成 |
+| L1-3 | 下单（数量/收货人/手机号/地址校验 + 服务端算金额 + 库存扣减） | 完成 |
+| L1-4 | 库存与订单同事务：库存不足 `40901`、已下架 `40902`、重复支付 `40903` | 完成 |
+
+### 前端分成了几个页面
+
+用 `vue-router@4` + history 模式（不是 hash——题目要求「地址直接粘到新标签页也能打开」）：
+
+| 地址 | 页面 | 组件 |
+|---|---|---|
+| `/` | 重定向到 `/products` | — |
+| `/products` | 商品列表（筛选 / 上下架 / 点标题进详情） | `views/ProductListView.vue` |
+| `/products/:id` | 商品详情（6 个字段 + 描述 + 直接下单） | `views/ProductDetailView.vue` |
+| `/publish` | 发布商品 | `views/PublishView.vue` |
+| `/orders` | 我的订单 | `views/OrderListView.vue` |
+| 其它 | 「页面不存在」+ 回列表 | `views/NotFoundView.vue` |
+
+`App.vue` 退化成外壳（页头 + `<AppNav />` + `<RouterView />` + toast 区），
+业务状态分别落在各页面，换页时自然重建；toast 和「下单用的手机号」是模块级单例，
+跨页面仍然连得上（发布成功跳回列表还能看到提示、改过手机号后「我的订单」仍能查到那一单）。
+
 ## 测试 / 自检
 
 ```bash
-# 前端：32 条
+# 前端：69 条
 cd frontend && npm test
 
-# 后端：27 条
+# 后端：47 条
 cd backend && ./mvnw -o test
 ```
 
 前端输出：
 
 ```
- ✓ test/money.test.js (16 tests) 8ms
- ✓ test/products.test.js (7 tests) 10ms
- ✓ test/proxy.test.js (9 tests) 8ms
+ ✓ test/money.test.js (24 tests)
+ ✓ test/orders.test.js (18 tests)
+ ✓ test/products.test.js (7 tests)
+ ✓ test/router.test.js (11 tests)
+ ✓ test/proxy.test.js (9 tests)
 
- Test Files  3 passed (3)
-      Tests  32 passed (32)
-   Duration  1.33s
+ Test Files  5 passed (5)
+      Tests  69 passed (69)
 ```
 
 `proxy.test.js` 锁的是「前端凭什么能连上后端」这件事本身：
@@ -156,13 +183,20 @@ cd backend && ./mvnw -o test
 `proxy['/api']` 的目标与 `changeOrigin`、`strictPort` 固定 5173。
 只要有人改坏代理配置，这几条会立刻红。
 
+`router.test.js` 用 `createMemoryHistory()` 在 node 环境跑，断言路由表本身：
+五个页面的名字与路径、`/` 的重定向、`/products/3` 解析出 `params.id === '3'`、
+`props: true` 是否生效、所有页面是否懒加载、未知地址是否落到 `not-found`、
+`?highlight=12` 的 query 是否原样保留。
+
 后端输出：
 
 ```
 [INFO] Tests run: 3,  Failures: 0, Errors: 0, Skipped: 0 -- in com.example.demo.DemoApplicationTests
 [INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0 -- in com.example.demo.product.ProductCreateTests
 [INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0 -- in com.example.demo.product.ProductQueryTests
-[INFO] Tests run: 27, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0 -- in com.example.demo.order.OrderCreateTests
+[INFO] Tests run: 9,  Failures: 0, Errors: 0, Skipped: 0 -- in com.example.demo.order.OrderQueryTests
+[INFO] Tests run: 47, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 
@@ -171,16 +205,22 @@ cd backend && ./mvnw -o test
 - 前端 `money.test.js`：`yuanToFen` / `fenToYuan` 的舍入、负数、超两位小数、`0`、空串、超大值。
 - 前端 `products.test.js`：`sellerName` 是否补齐、`description` 默认空串、请求体字段集合是否**精确匹配**、
   分页默认值、空筛选项是否被下发。
+- 前端 `orders.test.js`：下单请求体字段集合、数量/手机号校验、`buyerPhone` 是否必带、
+  错误码到中文文案的映射（`40901` 库存不足 / `40902` 已下架）。
+- 前端 `router.test.js`：路由表、根路径重定向、详情页 params、未知地址兜底。
 - 后端 `ProductCreateTests`：201、字段校验顺序、非法分类、价格非整数分、超长字段、显式 `description: null` 归一为空串。
 - 后端 `ProductQueryTests`：列表筛选、分页越界、404/400 分支、状态变更幂等。
+- 后端 `OrderCreateTests`：201、`quantity` 非整数/0/负数、手机号非 11 位、金额由服务端算、
+  库存不足 40901、已下架 40902、库存真的减了。
+- 后端 `OrderQueryTests`：按手机号归属、`buyerPhone` 必填、分页、状态文案。
 
 ## 没做完的地方
 
 | 项 | 状态 | 原因 |
 |---|---|---|
-| L1-1 ~ L1-4（详情页 / 订单 / 下单 / 我的订单） | 未做 | L0 里我花了较多时间在「前后端真的连上」和「边界数据不出错」上，L1 没开始 |
-| L2 挑战 | 未做 | 时间不够 |
+| L2 其它挑战（取消订单 / 支付 / 并发 / 导出…） | 未做 | 时间不够，只挑了与「多页面」直接相关的 L2-13 B |
 | 真实持久化（文件库 / MySQL） | 未做 | 刻意选内存库，见 `DESIGN.md` §5 |
+
 
 已知问题：
 
@@ -196,7 +236,7 @@ cd backend && ./mvnw -o test
 - [x] 删掉依赖目录后，按上面的命令能重新跑起来（`node_modules` / `target` 删过，重装重跑通过）
 - [x] 没提交 `node_modules` / `target` / `*.db` / `.env`（`.gitignore` 已覆盖）
 - [x] `DESIGN.md`、`AI_USAGE.md` 已填写完整
-- [x] 截图放进了 `screenshots/`（7 张，见下）
+- [x] 截图放进了 `screenshots/`（14 张，见下）
 
 ## 截图对应关系
 
@@ -209,3 +249,11 @@ cd backend && ./mvnw -o test
 | `l0-4-status-toggle.png` | 上下架：该行状态徽标变「已下架」，按钮变「上架」，顶部 toast「《二手无线鼠标》已下架」 |
 | `l0-5-empty-state.png` | 搜索 `zzz不存在的商品` 无结果的空态 + 「清空筛选」 |
 | `l0-5-loading-state.png` | 请求被延迟 4s 时捕获的加载态（spinner + 「加载中…」） |
+| `l1-1-order-list.png` | 我的订单：手机号 + 共 N 单 + 中文状态（待支付）+ 金额 ¥xx.xx |
+| `l1-2-order-form.png` | 详情页点「购买」后的下单面板：数量、预估总价、收货人/手机号/地址 |
+| `l2-1-product-list-routes.png` | 多页面后的列表页：顶部三个导航 + 「商品列表」高亮，行标题是可点进详情的链接 |
+| `l2-2-product-detail.png` | `/products/1` 详情页：价格/库存/分类/状态/卖家/上架时间 + 描述 + 购买/返回 |
+| `l2-3-detail-not-found.png` | `/products/9999`：**商品不存在** + 「没有找到 id 为 9999 的商品」+ 回列表 |
+| `l2-4-not-found.png` | `/no-such-page`：**页面不存在** + 回显地址 + 回列表 |
+| `l2-5-publish-page.png` | `/publish` 独立页面，「发布商品」导航高亮 |
+

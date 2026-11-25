@@ -172,6 +172,23 @@ textarea.input {
   background: var(--danger-bg);
 }
 
+/* ---------- 下单区 ---------- */
+.panel-buy {
+  border-color: #c7d8f3;
+  box-shadow: 0 4px 16px rgba(47, 111, 208, 0.08);
+}
+
+.buy-summary {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.buy-summary .badge {
+  margin-left: 6px;
+}
+
 /* ---------- 按钮 ---------- */
 .btn {
   padding: 7px 14px;
@@ -205,6 +222,11 @@ textarea.input {
 
 .btn-ghost:not(:disabled):hover {
   background: #f1f3f7;
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 13px;
 }
 
 /* ---------- 筛选 ---------- */
@@ -278,7 +300,48 @@ textarea.input {
 }
 
 .col-action {
-  width: 78px;
+  width: 132px;
+}
+
+/* 购买 / 上下架两个按钮并排；窄屏自动换行，不挤成一条 */
+.col-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* 订单表格：列宽按内容定，订单号/商品名可分到更多空间 */
+.table-orders {
+  min-width: 720px;
+}
+
+.col-order-no {
+  width: 150px;
+  font-variant-numeric: tabular-nums;
+}
+
+.col-qty {
+  width: 56px;
+  font-variant-numeric: tabular-nums;
+}
+
+.col-order-status {
+  width: 82px;
+}
+
+.col-time {
+  width: 132px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.col-order-no code {
+  font-size: 12px;
+}
+
+/* 刚下的那一单高亮一下，方便用户在长列表里认出来 */
+.row-new {
+  background: #f2f7ff;
 }
 
 /* 长标题 / 超长单词一律截断，不撑破布局 */
@@ -343,6 +406,12 @@ textarea.input {
 .badge-soldout {
   color: var(--danger);
   background: var(--danger-bg);
+}
+
+/* 订单状态「待支付」：既不是成功也不是失效，用主色区分开 */
+.badge-pending {
+  color: #245aab;
+  background: #e8f0fc;
 }
 
 /* ---------- 加载 / 空 / 错误态 ---------- */
@@ -427,4 +496,112 @@ textarea.input {
 .toast-error {
   border-left-color: var(--danger);
   color: var(--danger);
+}
+
+/* ---------- 导航（多页面） ---------- */
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-link {
+  padding: 6px 14px;
+  border-radius: 999px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 14px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.nav-link:hover {
+  background: #eceff4;
+  color: var(--text);
+}
+
+/* 当前所在页加粗上色，用户随时知道自己在哪一页 */
+.nav-link.is-active {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* ---------- 详情页 ---------- */
+.back-link {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.back-link:hover {
+  color: var(--primary);
+}
+
+/* 字段自适应的两列 / 多列栅格：窄屏自动落成一列 */
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px 18px;
+  margin: 0 0 16px;
+}
+
+.detail-grid dt {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.detail-grid dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.detail-desc {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #f7f9fc;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.7;
+  /* 描述可能很长、可能含超长单词，强制换行不撑破面板 */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.detail-desc-empty {
+  color: var(--muted);
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 详情页的「返回列表」是 RouterLink，需要按 .btn 的外观对齐行高 */
+.detail-actions .btn {
+  text-decoration: none;
+  display: inline-block;
+}
+
+.detail-grid dd .badge,
+.detail-grid dd .tag {
+  font-weight: 400;
+}
+
+/* 表格里的标题作为进入详情的链接：不能被截断省略号吃掉可点区域 */
+.title-link {
+  display: block;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.title-link:hover {
+  color: var(--primary);
+  text-decoration: underline;
 }

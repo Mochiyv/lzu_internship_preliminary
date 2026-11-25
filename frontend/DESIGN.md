@@ -5,11 +5,14 @@
 ## 1. 我做到了哪一步
 
 - [x] L0：5 / 5 条（列表、发布、上下架、加载/空/错三态，且前后端真连上了）
-- [ ] L1：0 / 4 条
-- [ ] L2：未做
+- [x] L1：4 / 4 条（订单列表 / 下单 / 库存扣减 / 订单三态）
+- [x] L2-13 B：路由（`/products/:id` 详情页 + 深链可打开 + 未知地址有提示）
+- [ ] L2 其它挑战：未做
 
-一句话：**我做了一个商品列表 + 发布 + 上下架的单页应用，从 Vue 拉到 Spring Boot 的 H2 库，
-它能发布、筛选、上下架、把三态显示清楚，但还不能下单和支付。**
+一句话：**我做了一个商品列表 + 发布 + 上下架 + 下单 + 我的订单的多页面应用，
+从 Vue 拉到 Spring Boot 的 H2 库，换页靠 `vue-router` 的 history 路由，
+`/products/3` 这种地址直接粘到新标签页也能打开。**
+
 
 ---
 
@@ -26,6 +29,7 @@
 | 7 | 前端先写死数据的列表，确认渲染通，再接 `fetch` | 出问题能立刻分清是「渲染错」还是「请求错」，不用两边一起猜 |
 | 8 | 接完 `fetch` 后补三态（加载/空/出错） | 三态是「请求真的发了」的副产品，先有请求才谈得上状态；一开始写三态只会写出一堆用不到的 `v-if` |
 | 9 | 最后补测试 | 接口契约已经稳定，这时候写的断言才是契约，不会写完就跟着实现改 |
+| 10 | 单页能跑通之后才拆多页面 | 先在一个 `App.vue` 里把数据和请求调通，`<script setup>` 的状态全在一处、排查最省事；等到要「从列表点进详情」「发布完跳回列表」时才引入 `vue-router`，拆出去只搬代码不改逻辑，回归风险最小 |
 
 **为什么不是「先把前端页面全画完再写后端」**：我先试过这条路，画到发布表单就卡住了——
 「价格输入 12.5，提交给后端是 12.5 还是 1250」这个问题前端自己回答不了，必须回头看接口约定。
@@ -52,12 +56,21 @@
 | 文件 / 模块 | 负责什么 | 为什么单独拆出来 |
 |---|---|---|
 | `api/client.js` | `fetch` 封装、`ApiError{code,status}`、网络失败文案 | 换 baseURL、加 header、统一报错只改一处 |
-| `api/products.js` | 5 个接口的出入参映射（含 `sellerName` 补齐） | 「后端要什么」和「页面有什么」的差异集中在这，组件不用知道 |
+| `api/products.js` | 商品接口的出入参映射（含 `sellerName` 补齐） | 「后端要什么」和「页面有什么」的差异集中在这，组件不用知道 |
+| `api/orders.js` | 下单 / 订单列表的出入参映射 + 默认收货人 | 收货信息的默认值和字段拼装只写一遍 |
 | `composables/useProducts.js` | 列表状态机：`items/total/loading/error/filters` + `reload/patchItemStatus` | 状态和请求绑在一起，组件只读不写；`patchItemStatus` 让上下架不用整表刷新 |
+| `composables/useOrders.js` | 订单状态机 + 模块级 `buyerPhone` + `rememberBuyerPhone()` | 「用谁的手机号查订单」必须跨页面共享：下单页改了号码，订单页要跟着查 |
+| `composables/useToasts.js` | 模块级 toast 列表 + `toast.success/error/info` | 渲染点在 `App.vue` 外壳、调用点在各个页面，状态必须提到模块作用域 |
 | `components/ProductForm.vue` | 5 字段表单 + 元→分换算 + 前端校验 + 成功反馈 | 表单的脏活（校验、清空、反馈）不和列表搅在一起 |
-| `components/ProductList.vue` | 筛选栏 + 三态 + 表格骨架 | 只负责「怎么显示」，行内的交互交给子组件 |
-| `components/ProductRow.vue` | 单行渲染 + `pending` 态禁用按钮 | 行是唯一需要处理「正在请求」粒度的单位 |
-| `utils/money.js` | `yuanToFen` / `fenToYuan` | 钱的换算最容易出错，独立成纯函数才好测（16 条测试全打这里） |
+| `components/ProductList.vue` | 筛选栏 + 三态 + 表格骨架 + `highlightId` | 只负责「怎么显示」，行内的交互交给子组件 |
+| `components/ProductRow.vue` | 单行渲染 + `pending` 态禁用按钮 + 标题作为详情链接 | 行是唯一需要处理「正在请求」粒度的单位 |
+| `components/OrderForm.vue` | 下单面板（数量 / 收货人 / 手机号 / 地址）+ 预估总价 | 下单是一个独立动作，不该塞进列表行里 |
+| `components/OrderList.vue` | 订单三态 + 中文状态 + 时间格式化 | 与商品列表不同的表结构，共用三态视觉语言但不共用组件 |
+| `components/AppNav.vue` | 三个导航项 + 自己算 active | `/products/3` 的 `matched` 里没有 `/products`，用内置 `router-link-active` 详情页时导航会一条都不亮 |
+| `router/index.js` | 路由表 + `createAppRouter(history)` 工厂 | 工厂形式让单测能注入 `createMemoryHistory()`，不必装 jsdom |
+| `views/*.vue` | 五个页面各管自己的状态与请求 | 换页即重建，天然不需要手动清理上一页的状态 |
+| `utils/money.js` | `yuanToFen` / `fenToYuan` | 钱的换算最容易出错，独立成纯函数才好测（24 条测试打这里） |
+| `utils/order.js` | 订单状态文案 / 徽标类名 / 时间格式化 | 同一套文案在两处用（列表 + 详情提示），独立成一列常量 |
 | `vite.config.js` | 5173 固定端口 + `/api` 代理 + `resolveApiTarget()` 优先级 | 「前端凭什么连得上后端」的唯一开关，独立成可导出的纯函数才能被测试锁住 |
 
 **如果再加「退款」和「优惠券」，哪里最先乱掉？**
@@ -91,9 +104,30 @@
       （不能只写 RETURN_GENERATED_KEYS：H2 会返回整行，GeneratedKeyHolder.getKey() 直接抛异常）
   → 201 + { code: 0, data: { id: 25, title: '二手无线鼠标', price: 1250, ... } }
   → 前端拿到 201 → 绿色反馈「发布成功：二手无线鼠标（¥12.50）」+ 清空 5 个输入框
-  → App.onCreated 调 reload() 重新拉列表 → 共 24 件变 25 件
-  → 新商品按 id 升序排在最后 → requestAnimationFrame 里 scrollIntoView 滚过去，用户直接看到
+  → PublishView.onCreated 调 router.push({ name:'products', query:{ highlight: 25 } })
+  → 跳回列表页，ProductList 把 highlightId 传给 ProductRow → 该行加 row-new 类并滚进视野，用户直接看到
 ```
+
+再来一条**下单 → 我的订单**的链路，它跨了两个页面，是这一轮最容易被问的地方：
+
+```
+用户在 /products/3 详情页点「购买」→ 展开 OrderForm，数量 2
+  → 前端算预估总价：multiplyFen(unitPrice, 2)，全程整数分
+  → POST /api/orders
+      body = { productId: 3, quantity: 2, buyerName, buyerPhone: '13800138000', address }
+  → 后端 OrderService：@Transactional 里先 SELECT ... FOR UPDATE 锁商品行
+      ── 已下架 → 409 + 40902；库存 < 2 → 409 + 40901（都不落单）
+      → 扣库存 UPDATE product SET stock = stock - 2
+      → 插入 order（status 硬编码 'created'，orderNo 由日期 + 序列拼）
+  → 201 + { code: 0, data: { orderNo: 'SO202611250001', totalAmount: 2500, ... } }
+  → rememberBuyerPhone('13800138000') 写进 useOrders 的模块级 ref
+  → toast「下单成功，订单号 SO202611250001」，商品库存就地 5 → 4（不整表刷新）
+  → 用户点导航「我的订单」→ /orders 挂载时读到共享的 buyerPhone
+      → GET /api/orders?buyerPhone=13800138000 → 刚下的那一单在列表里
+```
+
+`rememberBuyerPhone` 是这一步的关键：手机号存在 `composables/useOrders.js` 的**模块作用域**里，
+而不是存在某个组件的 `data` 里。组件随路由销毁重建，模块不会——所以换页面之后还查得到同一批订单。
 
 对照的失败分支（也在截图/测试里覆盖）：
 
@@ -178,8 +212,7 @@ OPTIONS /api/products   Access-Control-Request-Method: POST  →  403 Forbidden
 
 | 项 | 状态 | 原因 |
 |---|---|---|
-| L1（详情页 / 订单 / 下单 / 我的订单） | 没做 | 时间花在「前后端真连上」和边界数据上，L1 没开始 |
-| L2 挑战 | 没做 | 时间不够 |
+| L2 其它挑战（取消订单 / 支付 / 并发 / 导出） | 没做 | 时间不够，只做了与「多页面」相关的 L2-13 B 路由 |
 | 分页控件 | 没做 UI | 后端 `pageSize` 上限 50、前端默认取 50，24 条时等于不分页；上千条时必须补 |
 | 上下架并发保护 | 没做 | 两个浏览器同时点同一行，后写赢，不报冲突。需要 `version` 字段或 `WHERE status = ?` 条件更新 |
 | 关键词搜索 | `LIKE '%kw%'` 全表扫 | 数据量小无所谓，量大要建索引或换全文检索 |
@@ -193,9 +226,13 @@ OPTIONS /api/products   Access-Control-Request-Method: POST  →  403 Forbidden
 1. **补上下架的乐观锁（`version` 字段 + `WHERE id=? AND version=?`，冲突返回 409）。**
    排第一是因为它是**已知的正确性缺陷**：现在这个实现在两人同时操作时会静默覆盖，
    这种 bug 不会报错、只会让数据慢慢变脏，比「没做完的功能」危险得多。
-2. **做完 L1 的下单链路（`POST /api/orders` + 库存扣减放在同一个事务里）。**
-   排第二是因为它是题目的主线，而且能倒逼我把 `ProductService` 按动作拆开（见 §3 的追问）。
-   库存扣减必须和订单插入同事务，否则会出现「订单成立了、库存没减」。
+2. **补上「取消订单 / 支付」两个动作（`POST /api/orders/{id}/pay` 这类）。**
+   排第二是因为订单已经能建、能查，但状态机只有 `created` 一个出口——
+   下单之后既不能付也不能撤，闭环缺最后一环。它同时会逼我把订单状态流转写成
+   一条显式的合法迁移表（`created → paid / cancelled`），而不是散在 if 里。
 3. **补分页 UI + 把默认 `pageSize` 从 50 降到 20。**
    排第三是因为它影响的是「数据量变大之后」的体验，在 L0 的 24 条上完全看不出问题，
    优先级低于正确性、低于主线功能。
+4. **把商品列表的筛选条件同步到 URL query（`/products?kw=键盘&status=on`）。**
+   排最后是因为它是体验优化：现在筛选条件只活在组件里，刷新/分享就丢；
+   同步到 URL 之后「把我看的这个筛选发给同学」才成立，也和已有的 `?highlight=` 用法一致。
