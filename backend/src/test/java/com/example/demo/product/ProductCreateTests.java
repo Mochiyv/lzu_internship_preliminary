@@ -78,6 +78,17 @@ class ProductCreateTests {
 	}
 
 	@Test
+	void treatsExplicitNullDescriptionAsEmpty() throws Exception {
+		mockMvc.perform(post("/api/products")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{"title":"显式 null 描述","price":100,"stock":1,"category":"文具","description":null,"sellerName":"我"}
+						"""))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.data.description").value(""));
+	}
+
+	@Test
 	void rejectsNonPositiveOrNonIntegerPrice() throws Exception {
 		assertBadRequest("""
 				{"title":"商品","price":0,"stock":1,"category":"文具","sellerName":"我"}
