@@ -21,17 +21,39 @@
 
 ## 启动方式（必填，要能照抄）
 
+一键入口（推荐，封装了「查依赖 → 跑 pytest → 汇总退出码」）：
+
+```powershell
+cd testing\自动化
+.\run.ps1 -Install     # 第一次；之后直接 .\run.ps1
+```
+
+```bash
+cd testing/自动化
+./run.sh -Install      # macOS / Linux / Git Bash
+```
+
+不想用脚本，等价的裸命令：
+
 ```bash
 cd testing/自动化
 
 # 装依赖（只有这两个）
-pip install pytest requests
+pip install -r requirements.txt
 
 # 跑全部自动化用例
-python -m pytest -q
+python -m pytest
 ```
 
 **不需要手动启动被测服务**：`conftest.py` 会向系统申请一个空闲端口、自动拉起 `testing/sut/app.py`、轮询 `/health` 等待就绪，用例跑完后终止进程。
+
+三种运行模式（详见 [`自动化/README.md`](./自动化/README.md)）：
+
+| 模式 | 命令 | 谁负责启停 SUT |
+|---|---|---|
+| 默认 | `.\run.ps1` | 夹具，端口随机 |
+| 固定端口 | `.\run.ps1 -Port 8090` | 夹具，端口固定 |
+| 复用实例 | `.\run.ps1 -BaseUrl http://127.0.0.1:8080` | 你自己 |
 
 只想手工看接口返回：
 
@@ -56,15 +78,15 @@ curl.exe -s http://127.0.0.1:8080/health
 
 ```bash
 cd testing/自动化
-python -m pytest -q
+python -m pytest
 ```
 
-真实输出：
+真实输出（缩掉 `-ra` 逐条列出的 xfail）：
 
 ```text
 ...xx.xxxx..xx.......xxxxxx............xxxx.......xxxxx...........x..... [ 86%]
 ..........x                                                              [100%]
-58 passed, 25 xfailed in 10.06s
+============================== 58 passed, 25 xfailed in 10.06s ==============================
 ```
 
 收集项确认：
@@ -73,6 +95,16 @@ python -m pytest -q
 $ python -m pytest --collect-only -q
 83 tests collected in 0.07s
 ```
+
+三种入口都实跑过，结果一致：
+
+| 命令 | 结果 |
+|---|---|
+| `.\run.ps1` | 58 passed, 25 xfailed |
+| `.\run.ps1 -Port 8090 test_auth.py` | 3 passed, 2 xfailed |
+| `.\run.ps1 -BaseUrl http://127.0.0.1:8091 test_health.py` | 1 passed（夹具未启停进程） |
+| `bash ./run.sh test_health.py`（Git Bash） | 1 passed |
+| `python -m pytest testing/自动化`（从仓库根目录） | 58 passed, 25 xfailed |
 
 `83 = 58 passed + 25 xfailed`，**0 failed、0 error**。
 
@@ -87,7 +119,7 @@ $ python -m pytest --collect-only -q
 | [`缺陷报告.md`](./缺陷报告.md) | 19 条缺陷，每条含可复制的 `curl.exe` 命令与真实返回原文 | L0-3 |
 | [`测试报告.md`](./测试报告.md) | 用例与执行情况、16 个已测接口、问题按模块 × 严重程度分布、未覆盖内容、上线建议 | L0-4 |
 | [`代码审查.md`](./代码审查.md) | 15 条问题、10 种问题类型，附 6 段最小复刻脚本的真实验证输出 | L1-6 |
-| [`自动化/`](./自动化) | 7 个测试文件 + `conftest.py`，83 个 pytest 测试项 | L1-5 |
+| [`自动化/`](./自动化) | 7 个测试文件 + `conftest.py`，83 个 pytest 测试项；另含 `pytest.ini`、`requirements.txt`、`run.ps1`、`run.sh`、`README.md` | L1-5 |
 | [`DESIGN.md`](./DESIGN.md) | 设计说明 8 节 | 表达与设计 |
 | [`AI_USAGE.md`](./AI_USAGE.md) | AI 使用说明 6 节 | AI 使用 |
 
@@ -118,6 +150,8 @@ $ python -m pytest --collect-only -q
 - [x] 删掉依赖目录后，按上面的命令能重新跑起来（`pip install pytest requests` 后即可）
 - [x] 没提交 `node_modules` / `target` / `*.db` / `.env`（`testing/sut/sut.db` 在 `.gitignore` 内，每次启动重建）
 - [x] `DESIGN.md`、`AI_USAGE.md` 已填写完整
+- [x] `requirements.txt` 已固定版本（`pytest==8.3.4`、`requests==2.32.3`），与本文「环境」表一致
+- [x] `pytest.ini` 写成纯 ASCII（`iniconfig` 按 GBK 读 ini，非 ASCII 注释会让 pytest 收集前就崩）
 - [x] 截图：**测试方向不需要截图**，本条不适用
 
 ## 复现注意事项
